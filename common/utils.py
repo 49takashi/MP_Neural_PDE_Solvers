@@ -8,7 +8,7 @@ from torch.nn import functional as F
 from typing import Tuple
 from torch_geometric.data import Data
 from torch_cluster import radius_graph, knn_graph
-from equations.PDEs import *
+from ..equations.PDEs import *
 
 
 class HDF5Dataset(Dataset):
