@@ -3,7 +3,11 @@ from collections import OrderedDict
 from typing import Tuple
 from torch import nn
 from torch.nn import functional as F
-from equations.PDEs import PDE, CE, WE
+# from equations.PDEs import PDE, CE, WE
+import sys, os
+sys.path.append(os.path.join(os.path.dirname("__file__"), '..'))
+sys.path.append(os.path.join(os.path.dirname("__file__"), '..', '..'))
+from MP_Neural_PDE_Solvers.equations.PDEs import PDE, CE, WE
 
 
 class BaseCNN(nn.Module):

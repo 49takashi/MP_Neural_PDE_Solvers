@@ -1,9 +1,14 @@
 import torch
+import pdb
 from torch import nn
 from torch.nn import functional as F
 from torch_cluster import radius_graph
 from torch_geometric.data import Data
-from equations.PDEs import *
+import sys, os
+sys.path.append(os.path.join(os.path.dirname("__file__"), '..'))
+sys.path.append(os.path.join(os.path.dirname("__file__"), '..', '..'))
+from MP_Neural_PDE_Solvers.equations.PDEs import *
+# from equations.PDEs import *
 from torch_geometric.nn import MessagePassing, global_mean_pool, InstanceNorm, avg_pool_x, BatchNorm
 
 class Swish(nn.Module):
@@ -172,18 +177,18 @@ class MP_PDE_Solver(torch.nn.Module):
         Returns:
             torch.Tensor: data output
         """
-        u = data.x
+        u = data.x  # u: [640, 25]
         # Encode and normalize coordinate information
-        pos = data.pos
-        pos_x = pos[:, 1][:, None] / self.pde.L
+        pos = data.pos  # pos: [640, 2]
+        pos_x = pos[:, 1][:, None] / self.pde.L  # [640, 1]
         pos_t = pos[:, 0][:, None] / self.pde.tmax
-        edge_index = data.edge_index
+        edge_index = data.edge_index  # [2, 3648]
         batch = data.batch
 
         # Encode equation specific parameters
         # alpha, beta, gamma are used in E1,E2,E3 experiments
         # bc_left, bc_right, c are used in WE1, WE2, WE3 experiments
-        variables = pos_t    # time is treated as equation variable
+        variables = pos_t    # time is treated as equation variable : [640, 1]
         if "alpha" in self.eq_variables.keys():
             variables = torch.cat((variables, data.alpha / self.eq_variables["alpha"]), -1)
         if "beta" in self.eq_variables.keys():
@@ -198,16 +203,16 @@ class MP_PDE_Solver(torch.nn.Module):
             variables = torch.cat((variables, data.c / self.eq_variables["c"]), -1)
 
         # Encoder and processor (message passing)
-        node_input = torch.cat((u, pos_x, variables), -1)
-        h = self.embedding_mlp(node_input)
-        for i in range(self.hidden_layer):
-            h = self.gnn_layers[i](h, u, pos_x, variables, edge_index, batch)
+        node_input = torch.cat((u, pos_x, variables), -1)  # u: [640,25], pos_x: [640,1], variables (pos_t,alpha): [640,1]
+        h = self.embedding_mlp(node_input)  # [640, 128]
+        for i in range(self.hidden_layer):  # 6 layers
+            h = self.gnn_layers[i](h, u, pos_x, variables, edge_index, batch)  # h: [640, 128]
 
         # Decoder (formula 10 in the paper)
-        dt = (torch.ones(1, self.time_window) * self.pde.dt).to(h.device)
+        dt = (torch.ones(1, self.time_window) * self.pde.dt).to(h.device)  # dt: [1, 25]
         dt = torch.cumsum(dt, dim=1)
         # [batch*n_nodes, hidden_dim] -> 1DCNN([batch*n_nodes, 1, hidden_dim]) -> [batch*n_nodes, time_window]
-        diff = self.output_mlp(h[:, None]).squeeze(1)
-        out = u[:, -1].repeat(self.time_window, 1).transpose(0, 1) + dt * diff
+        diff = self.output_mlp(h[:, None]).squeeze(1)  # diff: [640, 25]
+        out = u[:, -1].repeat(self.time_window, 1).transpose(0, 1) + dt * diff  # out: [640, 25]
 
         return out

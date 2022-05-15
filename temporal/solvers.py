@@ -7,7 +7,7 @@ from torch.nn import functional as F
 from typing import Any, Callable
 from temporal.tableaux import *
 
-torch.set_default_dtype(torch.float64)
+torch.set_default_dtype(torch.float32)
 
 class Solver(nn.Module):
     """

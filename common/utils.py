@@ -1,6 +1,7 @@
 import os
 import h5py
 import numpy as np
+import pdb
 import torch
 from torch.utils.data import Dataset
 from torch import nn
@@ -8,7 +9,10 @@ from torch.nn import functional as F
 from typing import Tuple
 from torch_geometric.data import Data
 from torch_cluster import radius_graph, knn_graph
-from ..equations.PDEs import *
+import sys, os
+sys.path.append(os.path.join(os.path.dirname("__file__"), '..'))
+sys.path.append(os.path.join(os.path.dirname("__file__"), '..', '..'))
+from MP_Neural_PDE_Solvers.equations.PDEs import *
 
 
 class HDF5Dataset(Dataset):
@@ -82,8 +86,8 @@ class HDF5Dataset(Dataset):
             u_super = self.data[self.dataset_super][idx][::self.ratio_nt][None, None, ...]
             left = u_super[..., -3:-1]
             right = u_super[..., 1:3]
-            u_super_padded = torch.tensor(np.concatenate((left, u_super, right), -1))
-            weights = torch.tensor([[[[0.2]*5]]])
+            u_super_padded = torch.DoubleTensor(np.concatenate((left, u_super, right), -1))
+            weights = torch.DoubleTensor([[[[0.2]*5]]])
             u_super = F.conv1d(u_super_padded, weights, stride=(1, self.ratio_nx)).squeeze().numpy()
             x = self.x
 
@@ -124,7 +128,7 @@ class GraphCreator(nn.Module):
     def __init__(self,
                  pde: PDE,
                  neighbors: int = 2,
-                 time_window: int = 5,
+                 time_window: int = 25,
                  t_resolution: int = 250,
                  x_resolution: int =100
                  ) -> None:
@@ -160,9 +164,14 @@ class GraphCreator(nn.Module):
         """
         data = torch.Tensor()
         labels = torch.Tensor()
+        """
+        datapoints: [16, 250, 40]
+        steps: [50] * batch_size:16
+        self.tw: 25
+        """
         for (dp, step) in zip(datapoints, steps):
-            d = dp[step - self.tw:step]
-            l = dp[step:self.tw + step]
+            d = dp[step - self.tw:step]  # dp: [250, 40], obtaining steps [25:50]
+            l = dp[step:self.tw + step]  # obtaining steps [50:75]
             data = torch.cat((data, d[None, :]), 0)
             labels = torch.cat((labels, l[None, :]), 0)
 
@@ -179,9 +188,9 @@ class GraphCreator(nn.Module):
         Getting graph structure out of data sample
         previous timesteps are combined in one node
         Args:
-            data (torch.Tensor): input data tensor
+            data (torch.Tensor): input data tensor. data/labels: [B:16, tw:25, nx:40]
             labels (torch.Tensor): label tensor
-            x (torch.Tensor): spatial coordinates tensor
+            x (torch.Tensor): spatial coordinates tensor  [B:16, nx:40], repeated on B dimension
             variables (dict): dictionary of equation specific parameters
             steps (list): list of different starting points for each batch entry
         Returns:
@@ -189,11 +198,11 @@ class GraphCreator(nn.Module):
         """
         nt = self.pde.grid_size[0]
         nx = self.pde.grid_size[1]
-        t = torch.linspace(self.pde.tmin, self.pde.tmax, nt)
+        t = torch.linspace(self.pde.tmin, self.pde.tmax, nt)  # [250]
 
         u, x_pos, t_pos, y, batch = torch.Tensor(), torch.Tensor(), torch.Tensor(), torch.Tensor(), torch.Tensor()
-        for b, (data_batch, labels_batch, step) in enumerate(zip(data, labels, steps)):
-            u = torch.cat((u, torch.transpose(torch.cat([d[None, :] for d in data_batch]), 0, 1)), )
+        for b, (data_batch, labels_batch, step) in enumerate(zip(data, labels, steps)):  # data_batch/label_batch:  [tw:25, nx:40]
+            u = torch.cat((u, torch.transpose(torch.cat([d[None, :] for d in data_batch]), 0, 1)), )  # d: [nx:40]. u: [40, 25]
             y = torch.cat((y, torch.transpose(torch.cat([l[None, :] for l in labels_batch]), 0, 1)), )
             x_pos = torch.cat((x_pos, x[0]), )
             t_pos = torch.cat((t_pos, torch.ones(nx) * t[step]), )
@@ -209,7 +218,7 @@ class GraphCreator(nn.Module):
 
         graph = Data(x=u, edge_index=edge_index)
         graph.y = y
-        graph.pos = torch.cat((t_pos[:, None], x_pos[:, None]), 1)
+        graph.pos = torch.cat((t_pos[:, None], x_pos[:, None]), 1)  # t_pos: [640,]  x_pos: 640, graph.pos: [640, 2]
         graph.batch = batch.long()
 
         # Equation specific parameters
@@ -255,13 +264,13 @@ class GraphCreator(nn.Module):
             Data: Pytorch Geometric data graph
         """
         # Output is the new input
-        graph.x = torch.cat((graph.x, pred), 1)[:, self.tw:]
+        graph.x = torch.cat((graph.x, pred), 1)[:, self.tw:]   # self.tw: 25, graph.x/pred: [640, 25]
         nt = self.pde.grid_size[0]
         nx = self.pde.grid_size[1]
         t = torch.linspace(self.pde.tmin, self.pde.tmax, nt)
         # Update labels and input timesteps
         y, t_pos = torch.Tensor(), torch.Tensor()
-        for (labels_batch, step) in zip(labels, steps):
+        for (labels_batch, step) in zip(labels, steps):  # labels: [16, 25, 40], steps: list of 16 elements
             y = torch.cat((y, torch.transpose(torch.cat([l[None, :] for l in labels_batch]), 0, 1)), )
             t_pos = torch.cat((t_pos, torch.ones(nx) * t[step]), )
         graph.y = y

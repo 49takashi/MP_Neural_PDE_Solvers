@@ -5,6 +5,7 @@ import sys
 import time
 from datetime import datetime
 import torch
+import pdb
 import random
 import numpy as np
 from matplotlib import pyplot as plt
@@ -15,7 +16,11 @@ from common.utils import HDF5Dataset, GraphCreator
 from experiments.models_gnn import MP_PDE_Solver
 from experiments.models_cnn import BaseCNN
 from experiments.train_helper import *
-from equations.PDEs import *
+# from equations.PDEs import *
+import sys, os
+sys.path.append(os.path.join(os.path.dirname("__file__"), '..'))
+sys.path.append(os.path.join(os.path.dirname("__file__"), '..', '..'))
+from MP_Neural_PDE_Solvers.equations.PDEs import *
 
 def check_directory() -> None:
     """
@@ -56,7 +61,8 @@ def train(args: argparse,
 
     # Sample number of unrolling steps during training (pushforward trick)
     # Default is to unroll zero steps in the first epoch and then increase the max amount of unrolling steps per additional epoch.
-    max_unrolling = epoch if epoch <= args.unrolling else args.unrolling
+    # max_unrolling = epoch if epoch <= args.unrolling else args.unrolling  # args.unrolling = 1, max_unrolling go from 1 
+    max_unrolling = 1
     unrolling = [r for r in range(max_unrolling + 1)]
 
     # Loop over every epoch as often as the number of timesteps in one trajectory.
@@ -94,7 +100,7 @@ def test(args: argparse,
     model.eval()
 
    # first we check the losses for different timesteps (one forward prediction array!)
-    steps = [t for t in range(graph_creator.tw, graph_creator.t_res-graph_creator.tw + 1)]
+    steps = [t for t in range(graph_creator.tw, graph_creator.t_res-graph_creator.tw + 1)]  # tw: 25, t_res: 250. range(25, 250-25+1)
     losses = test_timestep_losses(model=model,
                                   steps=steps,
                                   batch_size=args.batch_size,
@@ -162,7 +168,7 @@ def main(args: argparse):
                                  shuffle=False,
                                  num_workers=4)
     except:
-        raise Exception("Datasets could not be loaded properly")
+        raise# Exception("Datasets could not be loaded properly")
 
     # Equation specific parameters
     pde.tmin = train_dataset.tmin
@@ -176,7 +182,6 @@ def main(args: argparse):
         logfile = f'experiments/log/{args.model}_{pde}_{args.experiment}_xresolution{args.base_resolution[1]}-{args.super_resolution[1]}_n{args.neighbors}_tw{args.time_window}_unrolling{args.unrolling}_time{timestring}.csv'
         print(f'Writing to log file {logfile}')
         sys.stdout = open(logfile, 'w')
-
     save_path = f'models/GNN_{pde}_{args.experiment}_xresolution{args.base_resolution[1]}-{args.super_resolution[1]}_n{args.neighbors}_tw{args.time_window}_unrolling{args.unrolling}_time{timestring}.pt'
     print(f'Training on dataset {train_string}')
     print(device)
@@ -226,7 +231,7 @@ def main(args: argparse):
     min_val_loss = 10e30
     test_loss = 10e30
     criterion = torch.nn.MSELoss(reduction="sum")
-    for epoch in range(args.num_epochs):
+    for epoch in range(args.num_epochs):  # 20 epochs
         print(f"Epoch {epoch}")
         train(args, pde, epoch, model, optimizer, train_loader, graph_creator, criterion, device=device)
         print("Evaluation on validation dataset:")

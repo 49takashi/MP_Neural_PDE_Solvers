@@ -1,9 +1,14 @@
 import torch
 import random
+import pdb
 from torch import nn, optim
 from torch.utils.data import DataLoader
 from common.utils import HDF5Dataset, GraphCreator
-from equations.PDEs import *
+# from equations.PDEs import *
+import sys, os
+sys.path.append(os.path.join(os.path.dirname("__file__"), '..'))
+sys.path.append(os.path.join(os.path.dirname("__file__"), '..', '..'))
+from MP_Neural_PDE_Solvers.equations.PDEs import *
 
 def training_loop(model: torch.nn.Module,
                   unrolling: list,
@@ -37,7 +42,7 @@ def training_loop(model: torch.nn.Module,
                                   graph_creator.t_res - graph_creator.tw - (graph_creator.tw * unrolled_graphs) + 1)]
         # Randomly choose starting (time) point at the PDE solution manifold
         random_steps = random.choices(steps, k=batch_size)
-        data, labels = graph_creator.create_data(u_super, random_steps)
+        data, labels = graph_creator.create_data(u_super, random_steps)  # data/labels: [B:16, tw:25, nx:40]
         if f'{model}' == 'GNN':
             graph = graph_creator.create_graph(data, labels, x, variables, random_steps).to(device)
         else:
@@ -51,6 +56,7 @@ def training_loop(model: torch.nn.Module,
                 _, labels = graph_creator.create_data(u_super, random_steps)
                 if f'{model}' == 'GNN':
                     pred = model(graph)
+                    # graph: Data(x=[640, 25], edge_index=[2, 3648], y=[640, 25], pos=[640, 2], batch=[640], alpha=[640, 1], beta=[640, 1], gamma=[640, 1])  # here graph.x has combined different graph via batch dimension
                     graph = graph_creator.create_next_graph(graph, pred, labels, random_steps).to(device)
                 else:
                     data = model(data)
@@ -58,7 +64,7 @@ def training_loop(model: torch.nn.Module,
 
         if f'{model}' == 'GNN':
             pred = model(graph)
-            loss = criterion(pred, graph.y)
+            loss = criterion(pred, graph.y)  # pred/graph.y: [640, 25]
         else:
             pred = model(data)
             loss = criterion(pred, labels)
@@ -118,9 +124,9 @@ def test_timestep_losses(model: torch.nn.Module,
 
 
 def test_unrolled_losses(model: torch.nn.Module,
-                         steps: list,
+                         steps: list,  # range(25, 250-25+1)
                          batch_size: int,
-                         nr_gt_steps: int,
+                         nr_gt_steps: int,  # 2
                          nx_base_resolution: int,
                          loader: DataLoader,
                          graph_creator: GraphCreator,
@@ -146,8 +152,8 @@ def test_unrolled_losses(model: torch.nn.Module,
         losses_tmp = []
         losses_base_tmp = []
         with torch.no_grad():
-            same_steps = [graph_creator.tw * nr_gt_steps] * batch_size
-            data, labels = graph_creator.create_data(u_super, same_steps)
+            same_steps = [graph_creator.tw * nr_gt_steps] * batch_size  # [50] * batch_size:16
+            data, labels = graph_creator.create_data(u_super, same_steps)  # first time: data: from 25:50, label: from 50:75
             if f'{model}' == 'GNN':
                 graph = graph_creator.create_graph(data, labels, x, variables, same_steps).to(device)
                 pred = model(graph)
@@ -166,12 +172,12 @@ def test_unrolled_losses(model: torch.nn.Module,
                 if f'{model}' == 'GNN':
                     graph = graph_creator.create_next_graph(graph, pred, labels, same_steps).to(device)
                     pred = model(graph)
-                    loss = criterion(pred, graph.y) / nx_base_resolution
+                    loss = criterion(pred, graph.y) / nx_base_resolution  # pred/graph.y: [640, 25]
                 else:
                     labels = labels.to(device)
                     pred = model(pred)
-                    loss = criterion(pred, labels) / nx_base_resolution
-                losses_tmp.append(loss / batch_size)
+                    loss = criterion(pred, labels) / nx_base_resolution 
+                losses_tmp.append(loss / batch_size)  # batch_size = 16
 
             # Losses for numerical baseline
             for step in range(graph_creator.tw * nr_gt_steps, graph_creator.t_res - graph_creator.tw + 1,
