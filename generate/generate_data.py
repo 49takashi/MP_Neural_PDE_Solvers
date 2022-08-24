@@ -1,4 +1,5 @@
 import argparse
+import pdb
 import os
 import sys
 import time
@@ -11,7 +12,13 @@ from scipy.integrate import solve_ivp
 from copy import copy
 from typing import Callable, Tuple
 from datetime import datetime
-from equations.PDEs import PDE, CE, WE
+import sys, os
+sys.path.append(os.path.join(os.path.dirname("__file__"), '..'))
+sys.path.append(os.path.join(os.path.dirname("__file__"), '..', '..'))
+sys.path.append(os.path.join(os.path.dirname("__file__"), '..', '..', '..'))
+sys.path.append(os.path.join(os.path.dirname("__file__"), '..', '..', '..', '..'))
+sys.path.append(os.path.join(os.path.dirname("__file__"), '..', '..', '..', '..', '..'))
+from plasma.design.MP_Neural_PDE_Solvers.equations.PDEs import PDE, CE, WE
 from temporal.solvers import *
 
 
@@ -257,7 +264,9 @@ def generate_data_combined_equation(experiment: str,
                                     device: torch.cuda.device = "cpu",
                                     alpha: list = [1., 1.],
                                     beta: list = [0., 0.],
-                                    gamma: list = [0., 0.]) -> None:
+                                    gamma: list = [0., 0.],
+                                    suffix: str = "",
+                                   ) -> None:
 
     """
     Generate data for combined equation using different coefficients
@@ -284,7 +293,7 @@ def generate_data_combined_equation(experiment: str,
     print(f'Batch size: {batch_size}')
     print(f'Number of batches: {num_batches}')
 
-    save_name = "data/" + "_".join([str(pde[list(pde.keys())[0]]), mode]) + "_" + experiment
+    save_name = "data/" + "_".join([str(pde[list(pde.keys())[0]]), mode]) + "_" + experiment + suffix
     h5f = h5py.File("".join([save_name, '.h5']), 'a')
     dataset = h5f.create_group(mode)
 
@@ -385,7 +394,10 @@ def combined_equation(experiment: str,
                       device: torch.cuda.device="cpu",
                       alpha: list = [1., 1.],
                       beta: list = [0., 0.],
-                      gamma: list = [0., 0]) -> None:
+                      gamma: list = [0., 0],
+                      nt_total: int = 250,
+                      nx_total: int = 200,
+                     ) -> None:
     """
     Setting up method, files and PDEs for combined equation with alpha, beta, gamma parameters
     Args:
@@ -400,12 +412,15 @@ def combined_equation(experiment: str,
         alpha (list): alpha parameter (low, high)
         beta (list): beta parameter (low, high)
         gamma (list): gamma parameter (low, high)
+        nt_total (int): total number of time steps
+        nx_total (int): total number of spatial intervals
+
     Returns:
         None
     """
     # Different temporal and spatial resolutions
-    nt = (250, 250, 250, 250)
-    nx = (200, 100, 50, 40)
+    nt = (nt_total, nt_total, nt_total, nt_total)
+    nx = (nx_total, nx_total//2, nx_total//4, nx_total//5)   # (200, 100, 50, 40)
     nt_max = max(nt)
     nx_max = max(nx)
 
@@ -413,7 +428,7 @@ def combined_equation(experiment: str,
     dateTimeObj = datetime.now()
     timestring = f'{dateTimeObj.date().month}{dateTimeObj.date().day}{dateTimeObj.time().hour}{dateTimeObj.time().minute}'
     if args.log:
-        logfile = f'data/log/CE_{experiment}_time{timestring}.csv'
+        logfile = f'data/log/CE_{experiment}_time{timestring}_nt_{nt_total}_nx_{nx_total}.csv'
         print(f'Writing to log file {logfile}')
         sys.stdout = open(logfile, 'w')
 
@@ -438,7 +453,9 @@ def combined_equation(experiment: str,
                                         device=device,
                                         alpha=alpha,
                                         beta=beta,
-                                        gamma=gamma)
+                                        gamma=gamma,
+                                        suffix=f"_nt_{nt_total}_nx_{nx_total}",
+                                       )
 
 
 def wave_equation(experiment: str,
@@ -525,7 +542,10 @@ def main(args):
                           device=args.device,
                           alpha=[1., 1.],
                           beta=[0., 0.],
-                          gamma=[0., 0.])
+                          gamma=[0., 0.],
+                          nt_total=args.nt_total,
+                          nx_total=args.nx_total,
+                         )
 
     elif args.experiment == 'E2':
         combined_equation(experiment=args.experiment,
@@ -538,7 +558,10 @@ def main(args):
                           device=args.device,
                           alpha=[1., 1.],
                           beta=[0., 0.2],
-                          gamma=[0., 0.])
+                          gamma=[0., 0.],
+                          nt_total=args.nt_total,
+                          nx_total=args.nx_total,
+                         )
 
     elif args.experiment == 'E3':
         combined_equation(experiment=args.experiment,
@@ -551,7 +574,10 @@ def main(args):
                           device=args.device,
                           alpha=[0., 6.],
                           beta=[0.1, 0.4],
-                          gamma=[0., 1.])
+                          gamma=[0., 1.],
+                          nt_total=args.nt_total,
+                          nx_total=args.nx_total,
+                         )
 
     elif args.experiment == "WE1":
         wave_equation(experiment=args.experiment,
@@ -612,6 +638,11 @@ if __name__ == "__main__":
                         help='Wave speed, only meaningful if set for wave equation experiments (WE1, WE2, WE3)')
     parser.add_argument('--log', type=eval, default=False,
                         help='pip the output to log file')
+    parser.add_argument('--nt_total', type=int, default=250,
+                        help='number of total time steps')
+    parser.add_argument('--nx_total', type=int, default=200,
+                        help='number of total space intervals')
+    
 
     args = parser.parse_args()
     main(args)
