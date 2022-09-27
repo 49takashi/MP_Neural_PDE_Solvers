@@ -12,15 +12,18 @@ from matplotlib import pyplot as plt
 from torch import nn, optim
 from torch.nn import functional as F
 from torch.utils.data import DataLoader
-from common.utils import HDF5Dataset, GraphCreator
-from experiments.models_gnn import MP_PDE_Solver
-from experiments.models_cnn import BaseCNN
-from experiments.train_helper import *
+
+torch.set_default_dtype(torch.float64)
 # from equations.PDEs import *
 import sys, os
 sys.path.append(os.path.join(os.path.dirname("__file__"), '..'))
 sys.path.append(os.path.join(os.path.dirname("__file__"), '..', '..'))
 from MP_Neural_PDE_Solvers.equations.PDEs import *
+from MP_Neural_PDE_Solvers.common.utils import HDF5Dataset, GraphCreator
+from MP_Neural_PDE_Solvers.experiments.models_gnn import MP_PDE_Solver
+from MP_Neural_PDE_Solvers.experiments.models_cnn import BaseCNN
+from MP_Neural_PDE_Solvers.experiments.models_fno import FNO1d
+from MP_Neural_PDE_Solvers.experiments.train_helper import *
 
 def check_directory() -> None:
     """
@@ -182,7 +185,7 @@ def main(args: argparse):
         logfile = f'experiments/log/{args.model}_{pde}_{args.experiment}_xresolution{args.base_resolution[1]}-{args.super_resolution[1]}_n{args.neighbors}_tw{args.time_window}_unrolling{args.unrolling}_time{timestring}.csv'
         print(f'Writing to log file {logfile}')
         sys.stdout = open(logfile, 'w')
-    save_path = f'models/GNN_{pde}_{args.experiment}_xresolution{args.base_resolution[1]}-{args.super_resolution[1]}_n{args.neighbors}_tw{args.time_window}_unrolling{args.unrolling}_time{timestring}.pt'
+    save_path = f'models/GNN_{pde}_{args.experiment}_{args.model}_xresolution{args.base_resolution[1]}-{args.super_resolution[1]}_n{args.neighbors}_tw{args.time_window}_unrolling{args.unrolling}_time{timestring}.pt'
     print(f'Training on dataset {train_string}')
     print(device)
     print(save_path)
@@ -216,6 +219,9 @@ def main(args: argparse):
     elif args.model == 'BaseCNN':
         model = BaseCNN(pde=pde,
                         time_window=args.time_window).to(device)
+    elif args.model == 'FNO':
+        model = FNO1d(pde=pde,
+                      modes=16, width=64, input_size=args.time_window, output_size=args.time_window).to(device)
     else:
         raise Exception("Wrong model specified")
 
