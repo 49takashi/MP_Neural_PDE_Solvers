@@ -180,9 +180,9 @@ class MP_PDE_Solver(torch.nn.Module):
         u = data.x  # u: [640, 25]
         # Encode and normalize coordinate information
         pos = data.pos  # pos: [640, 2]
-        pos_x = pos[:, 1][:, None] / self.pde.L  # [640, 1]
+        pos_x = pos[:, 1][:, None] / self.pde.L  # [640, 1];  [400,1]
         pos_t = pos[:, 0][:, None] / self.pde.tmax
-        edge_index = data.edge_index  # [2, 3648]
+        edge_index = data.edge_index  # [2, 3648]  ; [2, 2352]
         batch = data.batch
 
         # Encode equation specific parameters
@@ -213,6 +213,5 @@ class MP_PDE_Solver(torch.nn.Module):
         dt = torch.cumsum(dt, dim=1)
         # [batch*n_nodes, hidden_dim] -> 1DCNN([batch*n_nodes, 1, hidden_dim]) -> [batch*n_nodes, time_window]
         diff = self.output_mlp(h[:, None]).squeeze(1)  # diff: [640, 25]
-        out = u[:, -1].repeat(self.time_window, 1).transpose(0, 1) + dt * diff  # out: [640, 25]
-
+        out = u[:, -1].repeat(self.time_window, 1).transpose(0, 1) + dt * diff  # out: [640, 25]; [400, 25]
         return out

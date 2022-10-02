@@ -8,6 +8,7 @@ import sys, os
 sys.path.append(os.path.join(os.path.dirname("__file__"), '..'))
 sys.path.append(os.path.join(os.path.dirname("__file__"), '..', '..'))
 from MP_Neural_PDE_Solvers.equations.PDEs import PDE, CE, WE
+import pdb
 
 
 class BaseCNN(nn.Module):

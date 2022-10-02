@@ -10,9 +10,86 @@ from typing import Tuple
 from torch_geometric.data import Data
 from torch_cluster import radius_graph, knn_graph
 import sys, os
+from datetime import datetime
+from time import localtime, strftime, time
 sys.path.append(os.path.join(os.path.dirname("__file__"), '..'))
 sys.path.append(os.path.join(os.path.dirname("__file__"), '..', '..'))
 from MP_Neural_PDE_Solvers.equations.PDEs import *
+
+
+
+class Printer(object):
+    def __init__(self, is_datetime=True, store_length=100, n_digits=3):
+        """
+        Args:
+            is_datetime: if True, will print the local date time, e.g. [2021-12-30 13:07:08], as prefix.
+            store_length: number of past time to store, for computing average time.
+        Returns:
+            None
+        """
+        
+        self.is_datetime = is_datetime
+        self.store_length = store_length
+        self.n_digits = n_digits
+        self.limit_list = []
+
+    def print(self, item, tabs=0, is_datetime=None, banner_size=0, end=None, avg_window=-1, precision="second", is_silent=False):
+        if is_silent:
+            return
+        string = ""
+        if is_datetime is None:
+            is_datetime = self.is_datetime
+        if is_datetime:
+            str_time, time_second = get_time(return_numerical_time=True, precision=precision)
+            string += str_time
+            self.limit_list.append(time_second)
+            if len(self.limit_list) > self.store_length:
+                self.limit_list.pop(0)
+
+        string += "    " * tabs
+        string += "{}".format(item)
+        if avg_window != -1 and len(self.limit_list) >= 2:
+            string += "   \t{0:.{3}f}s from last print, {1}-step avg: {2:.{3}f}s".format(
+                self.limit_list[-1] - self.limit_list[-2], avg_window,
+                (self.limit_list[-1] - self.limit_list[-min(avg_window+1,len(self.limit_list))]) / avg_window,
+                self.n_digits,
+            )
+
+        if banner_size > 0:
+            print("=" * banner_size)
+        print(string, end=end)
+        if banner_size > 0:
+            print("=" * banner_size)
+        try:
+            sys.stdout.flush()
+        except:
+            pass
+
+    def warning(self, item):
+        print(colored(item, 'yellow'))
+        try:
+            sys.stdout.flush()
+        except:
+            pass
+
+    def error(self, item):
+        raise Exception("{}".format(item))
+
+
+p = Printer()
+
+def get_time(is_bracket=True, return_numerical_time=False, precision="second"):
+    """Get the string of the current local time."""
+    if precision == "second":
+        string = strftime("%Y-%m-%d %H:%M:%S", localtime())
+    elif precision == "millisecond":
+        string = datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')
+    if is_bracket:
+        string = "[{}] ".format(string)
+    if return_numerical_time:
+        return string, time()
+    else:
+        return string
 
 
 class HDF5Dataset(Dataset):
@@ -24,7 +101,10 @@ class HDF5Dataset(Dataset):
                  mode: str,
                  base_resolution: list=None,
                  super_resolution: list=None,
-                 load_all: bool=False) -> None:
+                 load_all: bool=False,
+                 uniform_sample: int=-1,
+                 is_return_super = False,
+                ) -> None:
         """Initialize the dataset object
         Args:
             path: path to dataset
@@ -44,22 +124,37 @@ class HDF5Dataset(Dataset):
         self.data = f[self.mode]
         self.base_resolution = (250, 100) if base_resolution is None else base_resolution
         self.super_resolution = (250, 200) if super_resolution is None else super_resolution
+        self.uniform_sample = uniform_sample
         self.dataset_base = f'pde_{self.base_resolution[0]}-{self.base_resolution[1]}'
         self.dataset_super = f'pde_{self.super_resolution[0]}-{self.super_resolution[1]}'
+        self.is_return_super = is_return_super
 
-        ratio_nt = self.data[self.dataset_super].shape[1] / self.data[self.dataset_base].shape[1]
-        ratio_nx = self.data[self.dataset_super].shape[2] / self.data[self.dataset_base].shape[2]
-        assert (ratio_nt.is_integer())
-        assert (ratio_nx.is_integer())
+        if self.base_resolution[1] != 34:
+            ratio_nt = self.data[self.dataset_super].shape[1] / self.data[self.dataset_base].shape[1]
+            ratio_nx = self.data[self.dataset_super].shape[2] / self.data[self.dataset_base].shape[2]
+        else:
+            ratio_nt = 1.0
+            ratio_nx = int(200 / 33)
+        # assert (ratio_nt.is_integer())
+        # assert (ratio_nx.is_integer())
         self.ratio_nt = int(ratio_nt)
         self.ratio_nx = int(ratio_nx)
 
-        self.nt = self.data[self.dataset_base].attrs['nt']
-        self.dt = self.data[self.dataset_base].attrs['dt']
-        self.dx = self.data[self.dataset_base].attrs['dx']
-        self.x = self.data[self.dataset_base].attrs['x']
-        self.tmin = self.data[self.dataset_base].attrs['tmin']
-        self.tmax = self.data[self.dataset_base].attrs['tmax']
+        if self.base_resolution[1] != 34:
+            self.nt = self.data[self.dataset_base].attrs['nt']
+            self.dt = self.data[self.dataset_base].attrs['dt']
+            self.dx = self.data[self.dataset_base].attrs['dx']
+            self.x = self.data[self.dataset_base].attrs['x']
+            self.tmin = self.data[self.dataset_base].attrs['tmin']
+            self.tmax = self.data[self.dataset_base].attrs['tmax']
+        else:
+            self.nt = 250
+            self.dt = self.data['pde_250-50'].attrs['dt']
+            self.dx = 0.16 * 3
+            self.x = self.data['pde_250-100'].attrs['x'][::3]
+            self.tmin = self.data['pde_250-50'].attrs['tmin']
+            self.tmax = self.data['pde_250-50'].attrs['tmax']
+        self.x_ori = self.data['pde_250-100'].attrs['x']
 
         if load_all:
             data = {self.dataset_super: self.data[self.dataset_super][:]}
@@ -88,17 +183,29 @@ class HDF5Dataset(Dataset):
             right = u_super[..., 1:3]
             u_super_padded = torch.DoubleTensor(np.concatenate((left, u_super, right), -1))
             weights = torch.DoubleTensor([[[[0.2]*5]]])
-            u_super = F.conv1d(u_super_padded, weights, stride=(1, self.ratio_nx)).squeeze().numpy()
+            if self.uniform_sample == -1:
+                u_super = F.conv1d(u_super_padded, weights, stride=(1, self.ratio_nx)).squeeze().numpy()
+            else:
+                u_super = F.conv1d(u_super_padded, weights, stride=(1, 2)).squeeze().numpy()
             x = self.x
 
+            # pdb.set_trace()
             # Base resolution trajectories (numerical baseline) and equation specific parameters
-            u_base = self.data[self.dataset_base][idx]
+            if self.uniform_sample != -1:
+                u_base = self.data[f'pde_{self.base_resolution[0]}-{100}'][idx][...,::self.uniform_sample]
+                u_super_core = u_super[...,::self.uniform_sample]
+            else:
+                u_base = self.data[self.dataset_base][idx]
+                u_super_core = u_super
             variables = {}
             variables['alpha'] = self.data['alpha'][idx]
             variables['beta'] = self.data['beta'][idx]
             variables['gamma'] = self.data['gamma'][idx]
 
-            return u_base, u_super, x, variables
+            if self.is_return_super:
+                return u_base, u_super_core, u_super, x, self.x_ori, variables
+            else:
+                return u_base, u_super_core, x, variables
 
         elif(f'{self.pde}' == 'WE'):
             # Super resolution trajectories are downprojected via kernel which averages of neighboring cell values
@@ -183,7 +290,9 @@ class GraphCreator(nn.Module):
                      labels: torch.Tensor,
                      x: torch.Tensor,
                      variables: dict,
-                     steps: list) -> Data:
+                     steps: list,
+                     uniform_sample: int,
+                    ) -> Data:
         """
         Getting graph structure out of data sample
         previous timesteps are combined in one node

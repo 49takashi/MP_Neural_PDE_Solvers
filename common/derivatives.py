@@ -2,7 +2,11 @@ import os
 import math
 import numpy as np
 import torch
-import common.coefficients as coefficients
+
+import sys, os
+sys.path.append(os.path.join(os.path.dirname("__file__"), '..'))
+sys.path.append(os.path.join(os.path.dirname("__file__"), '..', '..'))
+import MP_Neural_PDE_Solvers.common.coefficients as coefficients
 from torch import nn
 from scipy.ndimage import gaussian_filter
 from scipy.special import poch

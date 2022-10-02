@@ -5,9 +5,12 @@ from abc import ABC, abstractmethod
 from torch import nn
 from torch.nn import functional as F
 from typing import Any, Callable
-from temporal.tableaux import *
+import sys, os
+sys.path.append(os.path.join(os.path.dirname("__file__"), '..'))
+sys.path.append(os.path.join(os.path.dirname("__file__"), '..', '..'))
+from MP_Neural_PDE_Solvers.temporal.tableaux import *
 
-torch.set_default_dtype(torch.float32)
+torch.set_default_dtype(torch.float64)
 
 class Solver(nn.Module):
     """

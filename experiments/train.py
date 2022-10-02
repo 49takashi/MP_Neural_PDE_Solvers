@@ -12,18 +12,19 @@ from matplotlib import pyplot as plt
 from torch import nn, optim
 from torch.nn import functional as F
 from torch.utils.data import DataLoader
+import pickle
 
-torch.set_default_dtype(torch.float64)
 # from equations.PDEs import *
 import sys, os
 sys.path.append(os.path.join(os.path.dirname("__file__"), '..'))
 sys.path.append(os.path.join(os.path.dirname("__file__"), '..', '..'))
 from MP_Neural_PDE_Solvers.equations.PDEs import *
-from MP_Neural_PDE_Solvers.common.utils import HDF5Dataset, GraphCreator
+from MP_Neural_PDE_Solvers.common.utils import HDF5Dataset, GraphCreator, p
 from MP_Neural_PDE_Solvers.experiments.models_gnn import MP_PDE_Solver
 from MP_Neural_PDE_Solvers.experiments.models_cnn import BaseCNN
 from MP_Neural_PDE_Solvers.experiments.models_fno import FNO1d
 from MP_Neural_PDE_Solvers.experiments.train_helper import *
+server_name = os.uname()[1].split('.')[0]
 
 def check_directory() -> None:
     """
@@ -42,7 +43,10 @@ def train(args: argparse,
           loader: DataLoader,
           graph_creator: GraphCreator,
           criterion: torch.nn.modules.loss,
-          device: torch.cuda.device="cpu") -> None:
+          device: torch.cuda.device="cpu",
+          is_timing: bool = False,
+         ) -> None:
+
     """
     Training loop.
     Loop is over the mini-batches and for every batch we pick a random timestep.
@@ -71,8 +75,12 @@ def train(args: argparse,
     # Loop over every epoch as often as the number of timesteps in one trajectory.
     # Since the starting point is randomly drawn, this in expectation has every possible starting point/sample combination of the training data.
     # Therefore in expectation the whole available training information is covered.
+    p.print("0", precision="millisecond", is_silent=is_timing<1, avg_window=1)
     for i in range(graph_creator.t_res):
-        losses = training_loop(model, unrolling, args.batch_size, optimizer, loader, graph_creator, criterion, device)
+        p.print("1", precision="millisecond", is_silent=is_timing<1, avg_window=1)
+        losses = training_loop(model, unrolling, args.batch_size, optimizer, loader, graph_creator, criterion, device, is_timing=is_timing,
+                              uniform_sample=args.uniform_sample)
+        p.print("8", precision="millisecond", is_silent=is_timing<1, avg_window=1)
         if(i % args.print_interval == 0):
             print(f'Training Loss (progress: {i / graph_creator.t_res:.2f}): {torch.mean(losses)}')
 
@@ -110,7 +118,9 @@ def test(args: argparse,
                                   loader=loader,
                                   graph_creator=graph_creator,
                                   criterion=criterion,
-                                  device=device)
+                                  device=device,
+                                  uniform_sample=args.uniform_sample,
+                                 )
 
     # next we test the unrolled losses
     losses = test_unrolled_losses(model=model,
@@ -121,7 +131,9 @@ def test(args: argparse,
                                   loader=loader,
                                   graph_creator=graph_creator,
                                   criterion=criterion,
-                                  device=device)
+                                  device=device,
+                                  uniform_sample=args.uniform_sample,
+                                 )
 
     return torch.mean(losses)
 
@@ -138,11 +150,11 @@ def main(args: argparse):
     if args.experiment == 'E1' or args.experiment == 'E2' or args.experiment == 'E3':
         pde = CE(device=device)
         assert(base_resolution[0] == 250)
-        assert(base_resolution[1] == 100 or base_resolution[1] == 50 or base_resolution[1] == 40)
+        assert(base_resolution[1] == 100 or base_resolution[1] == 50 or base_resolution[1] == 40 or base_resolution[1] == 20 or base_resolution[1] == 34)
     elif args.experiment == 'WE1' or args.experiment == 'WE2' or args.experiment == 'WE3':
         pde = WE(device=device)
         assert (base_resolution[0] == 250)
-        assert (base_resolution[1] == 100 or base_resolution[1] == 50 or base_resolution[1] == 40 or base_resolution[1] == 20)
+        assert (base_resolution[1] == 100 or base_resolution[1] == 50 or base_resolution[1] == 40 or base_resolution[1] == 20 or base_resolution[1] == 34)
         if args.model != 'GNN':
             raise Exception("Only MP-PDE Solver is implemented for irregular grids so far.")
     else:
@@ -152,26 +164,25 @@ def main(args: argparse):
     train_string = f'data/{pde}_train_{args.experiment}.h5'
     valid_string = f'data/{pde}_valid_{args.experiment}.h5'
     test_string = f'data/{pde}_test_{args.experiment}.h5'
-    try:
-        train_dataset = HDF5Dataset(train_string, pde=pde, mode='train', base_resolution=base_resolution, super_resolution=super_resolution)
-        train_loader = DataLoader(train_dataset,
-                                  batch_size=args.batch_size,
-                                  shuffle=True,
-                                  num_workers=4)
 
-        valid_dataset = HDF5Dataset(valid_string, pde=pde, mode='valid', base_resolution=base_resolution, super_resolution=super_resolution)
-        valid_loader = DataLoader(valid_dataset,
-                                  batch_size=args.batch_size,
-                                  shuffle=False,
-                                  num_workers=4)
+    train_dataset = HDF5Dataset(train_string, pde=pde, mode='train', base_resolution=base_resolution, super_resolution=super_resolution, uniform_sample=args.uniform_sample)
+    train_loader = DataLoader(train_dataset,
+                              batch_size=args.batch_size,
+                              shuffle=True,
+                              num_workers=args.n_workers)
 
-        test_dataset = HDF5Dataset(test_string, pde=pde, mode='test', base_resolution=base_resolution, super_resolution=super_resolution)
-        test_loader = DataLoader(test_dataset,
-                                 batch_size=args.batch_size,
-                                 shuffle=False,
-                                 num_workers=4)
-    except:
-        raise# Exception("Datasets could not be loaded properly")
+    valid_dataset = HDF5Dataset(valid_string, pde=pde, mode='valid', base_resolution=base_resolution, super_resolution=super_resolution, uniform_sample=args.uniform_sample)
+    valid_loader = DataLoader(valid_dataset,
+                              batch_size=args.batch_size,
+                              shuffle=False,
+                              num_workers=args.n_workers)
+
+    test_dataset = HDF5Dataset(test_string, pde=pde, mode='test', base_resolution=base_resolution, super_resolution=super_resolution, uniform_sample=args.uniform_sample)
+    test_loader = DataLoader(test_dataset,
+                             batch_size=args.batch_size,
+                             shuffle=False,
+                             num_workers=args.n_workers)
+
 
     # Equation specific parameters
     pde.tmin = train_dataset.tmin
@@ -182,10 +193,10 @@ def main(args: argparse):
     timestring = f'{dateTimeObj.date().month}{dateTimeObj.date().day}{dateTimeObj.time().hour}{dateTimeObj.time().minute}'
 
     if(args.log):
-        logfile = f'experiments/log/{args.model}_{pde}_{args.experiment}_xresolution{args.base_resolution[1]}-{args.super_resolution[1]}_n{args.neighbors}_tw{args.time_window}_unrolling{args.unrolling}_time{timestring}.csv'
+        logfile = f'experiments/log/{args.model}_{pde}_{args.experiment}_xresolution{args.base_resolution[1]}-{args.super_resolution[1]}_n{args.neighbors}_tw{args.time_window}_unrolling{args.unrolling}_uni{args.uniform_sample}_server_{server_name}_time{timestring}{"_" + args.id if args.id != "" else ""}.csv'
         print(f'Writing to log file {logfile}')
         sys.stdout = open(logfile, 'w')
-    save_path = f'models/GNN_{pde}_{args.experiment}_{args.model}_xresolution{args.base_resolution[1]}-{args.super_resolution[1]}_n{args.neighbors}_tw{args.time_window}_unrolling{args.unrolling}_time{timestring}.pt'
+    save_path = f'models/GNN_{pde}_{args.experiment}_{args.model}_xresolution{args.base_resolution[1]}-{args.super_resolution[1]}_uni{args.uniform_sample}_n{args.neighbors}_tw{args.time_window}_unrolling{args.unrolling}_server_{server_name}_time{timestring}{"_" + args.id if args.id != "" else ""}.pt'
     print(f'Training on dataset {train_string}')
     print(device)
     print(save_path)
@@ -239,7 +250,7 @@ def main(args: argparse):
     criterion = torch.nn.MSELoss(reduction="sum")
     for epoch in range(args.num_epochs):  # 20 epochs
         print(f"Epoch {epoch}")
-        train(args, pde, epoch, model, optimizer, train_loader, graph_creator, criterion, device=device)
+        train(args, pde, epoch, model, optimizer, train_loader, graph_creator, criterion, device=device, is_timing=args.is_timing)
         print("Evaluation on validation dataset:")
         val_loss = test(args, pde, model, valid_loader, graph_creator, criterion, device=device)
         if(val_loss < min_val_loss):
@@ -247,6 +258,9 @@ def main(args: argparse):
             test_loss = test(args, pde, model, test_loader, graph_creator, criterion, device=device)
             # Save model
             torch.save(model.state_dict(), save_path)
+            with open(save_path[:-3] + "optim_dict.p", "wb") as f:
+                Dict = {"optim": optimizer.state_dict(), "scheduler": scheduler.state_dict(), "epoch": epoch}
+                pickle.dump(Dict, f)
             print(f"Saved model at {save_path}\n")
             min_val_loss = val_loss
 
@@ -277,8 +291,14 @@ if __name__ == "__main__":
             help='Learning rate')
     parser.add_argument('--lr_decay', type=float,
                         default=0.4, help='multistep lr decay')
+    parser.add_argument('--uniform_sample', type=int,
+                        default=-1, help='uniform_sample')
     parser.add_argument('--parameter_ablation', type=eval, default=False,
                         help='Flag for ablating MP-PDE solver without equation specific parameters')
+    parser.add_argument('--n_workers', type=int,
+                        default=4, help='number of workers')
+    parser.add_argument('--id', type=str,
+                        default="", help='id')
 
     # Base resolution and super resolution
     parser.add_argument('--base_resolution', type=lambda s: [int(item) for item in s.split(',')],
@@ -293,6 +313,10 @@ if __name__ == "__main__":
                         default=1, help="Unrolling which proceeds with each epoch")
     parser.add_argument('--nr_gt_steps', type=int,
                         default=2, help="Number of steps done by numerical solver")
+    parser.add_argument('--is_timing', type=int,
+                        default=0, help="is timing")
+    parser.add_argument('--load_epoch', type=int,
+                        default=-1, help="Load epoch")
 
     # Misc
     parser.add_argument('--print_interval', type=int, default=20,
