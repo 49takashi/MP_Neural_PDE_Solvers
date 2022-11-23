@@ -10,7 +10,7 @@ sys.path.append(os.path.join(os.path.dirname("__file__"), '..'))
 sys.path.append(os.path.join(os.path.dirname("__file__"), '..', '..'))
 from MP_Neural_PDE_Solvers.temporal.tableaux import *
 
-torch.set_default_dtype(torch.float64)
+torch.set_default_dtype(torch.float32)
 
 class Solver(nn.Module):
     """
