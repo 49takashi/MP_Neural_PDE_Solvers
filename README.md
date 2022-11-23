@@ -28,6 +28,8 @@ source environment.sh
 ### Produce datasets for tasks E1, E2, E3, WE1, WE2, WE3
 `python generate/generate_data.py --experiment={E1, E2, E3, WE1, WE2, WE3} --train_samples=2048 --valid_samples=128 --test_samples=128 --log=True --device=cuda:0`
 
+Note, to generate the dataset, need to go to [line 13](https://github.com/tailintalent/MP_Neural_PDE_Solvers/blob/64151880f6683ad42af106cbe1db4656450b709c/temporal/solvers.py#L13) of [/temporal/solvers.py](https://github.com/tailintalent/MP_Neural_PDE_Solvers/blob/master/temporal/solvers.py) and change this line to `torch.set_default_dtype(torch.float32)`.
+
 ###  Train MP-PDE solvers for tasks E1, E2, E3
 
 `python experiments/train.py --device=cuda:0 --experiment={E1, E2, E3} --model={GNN, ResCNN, Res1DCNN} --base_resolution=250,{100,50,40} --time_window=25 --log=True`
