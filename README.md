@@ -1,6 +1,6 @@
-## Baseline commands:
+# Baseline commands:
 
-Here are the commands for the baselines for 1D experiments for [lamp repo](https://github.com/snap-stanford/lamp/):
+Here are the commands for the baselines for 1D experiments for the [lamp repo](https://github.com/snap-stanford/lamp/):
 
 First, cd into the folder of MP_Neural_PDE_Solvers/. Then, run one of the following commands:
 
