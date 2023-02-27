@@ -129,18 +129,23 @@ class HDF5Dataset(Dataset):
         self.dataset_super = f'pde_{self.super_resolution[0]}-{self.super_resolution[1]}'
         self.is_return_super = is_return_super
 
-        if self.base_resolution[1] != 34:
+        if self.base_resolution[1] not in [34, 25]:
             ratio_nt = self.data[self.dataset_super].shape[1] / self.data[self.dataset_base].shape[1]
             ratio_nx = self.data[self.dataset_super].shape[2] / self.data[self.dataset_base].shape[2]
         else:
             ratio_nt = 1.0
-            ratio_nx = int(200 / 33)
+            if self.base_resolution[1] == 34:
+                ratio_nx = int(200 / 33)
+            elif self.base_resolution[1] == 25:
+                ratio_nx = int(200 / 25)
+            else:
+                raise
         # assert (ratio_nt.is_integer())
         # assert (ratio_nx.is_integer())
         self.ratio_nt = int(ratio_nt)
         self.ratio_nx = int(ratio_nx)
 
-        if self.base_resolution[1] != 34:
+        if self.base_resolution[1] not in [34, 25]:
             self.nt = self.data[self.dataset_base].attrs['nt']
             self.dt = self.data[self.dataset_base].attrs['dt']
             self.dx = self.data[self.dataset_base].attrs['dx']
@@ -150,8 +155,14 @@ class HDF5Dataset(Dataset):
         else:
             self.nt = 250
             self.dt = self.data['pde_250-50'].attrs['dt']
-            self.dx = 0.16 * 3
-            self.x = self.data['pde_250-100'].attrs['x'][::3]
+            if self.base_resolution[1] == 34:
+                self.dx = 0.16 * 3
+                self.x = self.data['pde_250-100'].attrs['x'][::3]
+            elif self.base_resolution[1] == 25:
+                self.dx = 0.16 * 4
+                self.x = self.data['pde_250-100'].attrs['x'][::4]
+            else:
+                raise
             self.tmin = self.data['pde_250-50'].attrs['tmin']
             self.tmax = self.data['pde_250-50'].attrs['tmax']
         self.x_ori = self.data['pde_250-100'].attrs['x']

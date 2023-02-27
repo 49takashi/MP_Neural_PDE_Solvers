@@ -1,3 +1,59 @@
+## Baseline commands:
+
+Here are the commands for the baselines for 1D experiments for [lamp repo](https://github.com/snap-stanford/lamp/):
+
+First, cd into the folder of MP_Neural_PDE_Solvers/. Then, run one of the following commands:
+
+MP-PDE with initial 25 nodes:
+
+```code
+python experiments/train.py --device=cuda:0 --experiment=E2 --model=GNN --base_resolution=250,25 --time_window=25 --uniform_sample=4 --id=0
+```
+
+MP-PDE with initial 50 nodes:
+
+```code
+python experiments/train.py --device=cuda:0 --experiment=E2 --model=GNN --base_resolution=250,50 --time_window=25 --uniform_sample=2 --id=0
+```
+
+MP-PDE with initial 100 nodes:
+
+```code
+python experiments/train.py --device=cuda:0 --experiment=E2 --model=GNN --base_resolution=250,100 --time_window=25 --uniform_sample=-1 --id=0
+```
+
+CNN with initial 25 nodes:
+```code
+python experiments/train.py --device=cuda:0 --experiment=E2 --model=BaseCNN --base_resolution=250,100 --time_window=25 --uniform_sample=4 --id=0
+```
+
+CNN with initial 50 nodes:
+```code
+python experiments/train.py --device=cuda:0 --experiment=E2 --model=BaseCNN --base_resolution=250,100 --time_window=25 --uniform_sample=2 --id=0
+```
+
+CNN with initial 100 nodes:
+```code
+python experiments/train.py --device=cuda:0 --experiment=E2 --model=BaseCNN --base_resolution=250,100 --time_window=25 --uniform_sample=-1 --id=0
+```
+
+FNO with initial 25 nodes:
+```code
+python experiments/train.py --device=cuda:0 --experiment=E2 --model=FNO --base_resolution=250,100 --time_window=25 --uniform_sample=4 --id=0
+```
+
+FNO with initial 50 nodes:
+```code
+python experiments/train.py --device=cuda:0 --experiment=E2 --model=FNO --base_resolution=250,100 --time_window=25 --uniform_sample=2 --id=0
+```
+
+FNO with initial 100 nodes:
+```code
+python experiments/train.py --device=cuda:0 --experiment=E2 --model=FNO --base_resolution=250,100 --time_window=25 --uniform_sample=-1 --id=0
+```
+
+The following is the original README:
+
 # Message Passing Neural PDE Solvers
 
 Johannes Brandstetter*, Daniel Worrall*, Max Welling

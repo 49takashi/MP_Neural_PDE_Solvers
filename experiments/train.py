@@ -150,7 +150,7 @@ def main(args: argparse):
     if args.experiment == 'E1' or args.experiment == 'E2' or args.experiment == 'E3':
         pde = CE(device=device)
         assert(base_resolution[0] == 250)
-        assert(base_resolution[1] == 100 or base_resolution[1] == 50 or base_resolution[1] == 40 or base_resolution[1] == 20 or base_resolution[1] == 34)
+        assert(base_resolution[1] == 100 or base_resolution[1] == 50 or base_resolution[1] == 40 or base_resolution[1] == 25 or base_resolution[1] == 20 or base_resolution[1] == 34)
     elif args.experiment == 'WE1' or args.experiment == 'WE2' or args.experiment == 'WE3':
         pde = WE(device=device)
         assert (base_resolution[0] == 250)
@@ -161,9 +161,10 @@ def main(args: argparse):
         raise Exception("Wrong experiment")
 
     # Load datasets
-    train_string = f'data/{pde}_train_{args.experiment}.h5'
-    valid_string = f'data/{pde}_valid_{args.experiment}.h5'
-    test_string = f'data/{pde}_test_{args.experiment}.h5'
+    dir_path = "../data/mppde1d_data"
+    train_string = dir_path + f'/{pde}_train_{args.experiment}.h5'
+    valid_string = dir_path + f'/{pde}_valid_{args.experiment}.h5'
+    test_string = dir_path + f'/{pde}_test_{args.experiment}.h5'
 
     train_dataset = HDF5Dataset(train_string, pde=pde, mode='train', base_resolution=base_resolution, super_resolution=super_resolution, uniform_sample=args.uniform_sample)
     train_loader = DataLoader(train_dataset,
