@@ -232,8 +232,10 @@ def main(args: argparse):
         model = BaseCNN(pde=pde,
                         time_window=args.time_window).to(device)
     elif args.model == 'FNO':
+        modes = min(16, (100 // args.uniform_sample) // 2 + 1)
+        print(f"Use {modes} modes.")
         model = FNO1d(pde=pde,
-                      modes=16, width=64, input_size=args.time_window, output_size=args.time_window).to(device)
+                      modes=modes, width=64, input_size=args.time_window, output_size=args.time_window).to(device)
     else:
         raise Exception("Wrong model specified")
 
