@@ -1,6 +1,8 @@
 # Baseline commands:
 
-Here are the commands for the baselines for 1D experiments for the [lamp repo](https://github.com/snap-stanford/lamp/):
+## Training:
+
+Here are the commands for training the baselines for 1D experiments for the [lamp repo](https://github.com/snap-stanford/lamp/):
 
 First, cd into the folder of MP_Neural_PDE_Solvers/. Then, run one of the following commands:
 
@@ -51,6 +53,11 @@ FNO with initial 100 nodes:
 ```code
 python experiments/train.py --device=cuda:0 --experiment=E2 --model=FNO --base_resolution=250,100 --time_window=25 --uniform_sample=-1 --id=0
 ```
+
+## Analysis:
+
+Use [analysis.ipynb](https://github.com/tailintalent/MP_Neural_PDE_Solvers/blob/master/analysis.ipynb) to analyze the results for the baselines.
+
 
 The following is the original README:
 
